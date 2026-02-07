@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Container,
     Paper,
@@ -14,15 +14,45 @@ import {
 } from '@mantine/core';
 import { useSimulation } from '../hooks/useSimulation';
 import type { CreditSimulationRequest } from '../types';
-import '@mantine/core/styles.css'
+import '@mantine/core/styles.css';
+
+const STORAGE_KEY = 'credit-simulation-form-data';
+
+const DEFAULT_FORM_DATA: CreditSimulationRequest = {
+    amount: 10000,
+    annual_rate: 12.5,
+    months: 24,
+};
+
+// Helper para cargar datos del localStorage
+const loadFormData = (): CreditSimulationRequest => {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    } catch (error) {
+        console.error('Error loading form data from localStorage:', error);
+    }
+    return DEFAULT_FORM_DATA;
+};
 
 export function SimulationForm() {
     const { data, loading, error, simulate, reset } = useSimulation();
-    const [formData, setFormData] = useState<CreditSimulationRequest>({
-        amount: 10000,
-        annual_rate: 12.5,
-        months: 24,
-    });
+    const [formData, setFormData] = useState<CreditSimulationRequest>(loadFormData);
+
+    // Persistir datos del formulario en localStorage
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    }, [formData]);
+
+    // Limpiar resultados cuando cambien los valores del formulario
+    useEffect(() => {
+        if (data) {
+            reset();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData.amount, formData.annual_rate, formData.months]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,11 +61,7 @@ export function SimulationForm() {
 
     const handleReset = () => {
         reset();
-        setFormData({
-            amount: 10000,
-            annual_rate: 12.5,
-            months: 24,
-        });
+        setFormData(DEFAULT_FORM_DATA);
     };
 
     const formatCurrency = (value: number): string => {
