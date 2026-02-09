@@ -13,7 +13,8 @@ import {
     Loader,
 } from '@mantine/core';
 import { useSimulation } from '../hooks/useSimulation';
-import type { CreditSimulationRequest } from '../types';
+import { creditClient } from '../api';
+import type { CreditSimulationRequest, CreditSimulationByIdResponse } from '../types';
 import '@mantine/core/styles.css';
 
 const STORAGE_KEY = 'credit-simulation-form-data';
@@ -40,6 +41,8 @@ const loadFormData = (): CreditSimulationRequest => {
 export function SimulationForm() {
     const { data, loading, error, simulate, reset } = useSimulation();
     const [formData, setFormData] = useState<CreditSimulationRequest>(loadFormData);
+    const [simulationData, setSimulationData] = useState<CreditSimulationByIdResponse | null>(null);
+    const [loadingRisk, setLoadingRisk] = useState<boolean>(false);
 
     // Persistir datos del formulario en localStorage
     useEffect(() => {
@@ -56,8 +59,31 @@ export function SimulationForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSimulationData(null);
         await simulate(formData);
     };
+
+    // obtención del riesgo despues
+    useEffect(() => {
+        if (data && data.simulation_id && !simulationData && !loadingRisk) {
+            const fetchRiskScore = async () => {
+                setLoadingRisk(true);
+                // Esperar 5 segundos
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+                try {
+                    const detailedData = await creditClient.getSimulationById(data.simulation_id);
+                    setSimulationData(detailedData);
+                } catch (err) {
+                    console.error('Error fetching risk score:', err);
+                } finally {
+                    setLoadingRisk(false);
+                }
+            };
+
+            fetchRiskScore();
+        }
+    }, [data]);
 
     const handleReset = () => {
         reset();
@@ -158,32 +184,53 @@ export function SimulationForm() {
 
                 {data && !loading && (
                     <Paper shadow="sm" p="xl" radius="md" withBorder>
-                        <Title order={3} mb="lg">
-                            Tabla de Amortización
-                        </Title>
+                        <Stack gap="md">
+                            <Group justify="space-between" align="flex-start">
+                                <div>
+                                    <Title order={3} mb="xs">
+                                        Tabla de Amortización
+                                    </Title>
+                                    <Text size="sm" c="dimmed">ID de simulación: {data.simulation_id}</Text>
+                                </div>
 
-                        <Table striped highlightOnHover withTableBorder withColumnBorders>
-                            <Table.Thead>
-                                <Table.Tr>
-                                    <Table.Th>Mes</Table.Th>
-                                    <Table.Th>Pago</Table.Th>
-                                    <Table.Th>Capital</Table.Th>
-                                    <Table.Th>Interés</Table.Th>
-                                    <Table.Th>Saldo Restante</Table.Th>
-                                </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                                {data.schedule.map((item) => (
-                                    <Table.Tr key={item.month}>
-                                        <Table.Td>{item.month}</Table.Td>
-                                        <Table.Td>{formatCurrency(item.payment)}</Table.Td>
-                                        <Table.Td>{formatCurrency(item.principal)}</Table.Td>
-                                        <Table.Td>{formatCurrency(item.interest)}</Table.Td>
-                                        <Table.Td>{formatCurrency(item.remaining_balance)}</Table.Td>
+                                {loadingRisk ? (
+                                    <Group gap="xs">
+                                        <Loader size="sm" />
+                                        <Text size="sm">Calculando Risk Score...</Text>
+                                    </Group>
+                                ) : simulationData ? (
+                                    <Paper withBorder p="xs" radius="md" bg="blue.0">
+                                        <Stack gap={0}>
+                                            <Text size="xs" fw={700} c="blue.9">RISK SCORE</Text>
+                                            <Text size="xl" fw={900} c="blue.9">{simulationData.risk_score}</Text>
+                                        </Stack>
+                                    </Paper>
+                                ) : null}
+                            </Group>
+
+                            <Table striped highlightOnHover withTableBorder withColumnBorders>
+                                <Table.Thead>
+                                    <Table.Tr>
+                                        <Table.Th>Mes</Table.Th>
+                                        <Table.Th>Pago</Table.Th>
+                                        <Table.Th>Capital</Table.Th>
+                                        <Table.Th>Interés</Table.Th>
+                                        <Table.Th>Saldo Restante</Table.Th>
                                     </Table.Tr>
-                                ))}
-                            </Table.Tbody>
-                        </Table>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                    {data.schedule.map((item) => (
+                                        <Table.Tr key={item.month}>
+                                            <Table.Td>{item.month}</Table.Td>
+                                            <Table.Td>{formatCurrency(item.payment)}</Table.Td>
+                                            <Table.Td>{formatCurrency(item.principal)}</Table.Td>
+                                            <Table.Td>{formatCurrency(item.interest)}</Table.Td>
+                                            <Table.Td>{formatCurrency(item.remaining_balance)}</Table.Td>
+                                        </Table.Tr>
+                                    ))}
+                                </Table.Tbody>
+                            </Table>
+                        </Stack>
                     </Paper>
                 )}
             </Stack>

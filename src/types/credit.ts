@@ -16,5 +16,16 @@ export interface PaymentScheduleItem {
 
 // Response from credit simulation API
 export interface CreditSimulationResponse {
+    simulation_id: string;
     schedule: PaymentScheduleItem[];
+}
+
+export interface CreditSimulationByIdResponse {
+    id: string;
+    amount: number;
+    annual_rate: number;
+    months: number;
+    risk_score: string;
+    created_at: string;
+    updated_at: string;
 }
